@@ -3,15 +3,17 @@
 class SocketTask {
 private:
     int _id;
+    ConnectionHandler* ch;
+    Protocol* protocol;
 public:
-    SocketTask(int number, ConnectionHandler connectionHandler) : _id(number)  {}
+    SocketTask(int number, ConnectionHandler* ch, Protocol* protocol) : _id(number), ch(ch), protocol(protocol)  {}
     void operator()(){
-//        const short bufsize = 1024;
-//        char buf[bufsize];
 
-//        while (1) {
-//
-//        }
+        while (1) {
+            char nextByte;
+            ch->getBytes(&nextByte, 1);
+            protocol->readByte(nextByte);
+        }
         boost::this_thread::yield(); //Gives up the remainder of the current thread's time slice, to allow other threads to run.
     }
 };

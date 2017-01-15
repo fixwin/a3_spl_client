@@ -1,9 +1,10 @@
 #ifndef CONNECTION_HANDLER__
 #define CONNECTION_HANDLER__
-                                           
+
 #include <string>
 #include <iostream>
 #include <boost/asio.hpp>
+#include "Protocol.h"
 
 using boost::asio::ip::tcp;
 
@@ -12,8 +13,10 @@ private:
 	const std::string host_;
 	const short port_;
 	boost::asio::io_service io_service_;   // Provides core I/O functionality
-	tcp::socket socket_; 
- 
+	tcp::socket socket_;
+//	Protocol* protocol;
+
+	short bytesToShort(char* bytesArr);
 public:
     ConnectionHandler(std::string host, short port);
     virtual ~ConnectionHandler();
@@ -47,7 +50,7 @@ public:
 	
     // Close down the connection properly.
     void close();
- 
+
 }; //class ConnectionHandler
  
 #endif
