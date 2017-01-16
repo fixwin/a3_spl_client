@@ -27,6 +27,13 @@ void Protocol::readByte(char nextByte) {
                     shortArray[counter - 4] = nextByte;
                     if (counter == 5) {
                         blockNum = bytesToShort(shortArray);
+                        if (packetSize == 0) {
+                            DataMessage m(packetSize, blockNum, readerArr.data());
+                            readerArr.clear();
+                            counter = 0;
+                            process(&m);
+                            return;
+                        }
                     }
                 } else if (counter < 6 + packetSize) { //if reading data
                     readerArr.push_back(nextByte);
@@ -70,6 +77,7 @@ void Protocol::readByte(char nextByte) {
                     readerArr.push_back(nextByte);
                 } else { //if finished
                     //add error
+                    readerArr.push_back(nextByte);
                     ErrMessage m(errorCode, readerArr.data());
                     readerArr.clear();
                     counter = 0;
@@ -119,9 +127,14 @@ void Protocol::sendMessage(std::string message) {
         currentState = SendingFile;
         filename = mes;
         bytesSent = 0;
+        blockNum = 1;
 
-        ifstream myfile;
-        myfile.open(filename);
+        ifstream myfile(filename.c_str());
+//        myfile.open(filename.c_str());
+        if (!myfile.is_open()) {
+            cout << "file does not exist" << endl;
+            return;
+        }
         myfile.seekg(0, std::ios::end);
         size_t fileSize = myfile.tellg();
         writeBuffer = new char[fileSize];
@@ -130,6 +143,7 @@ void Protocol::sendMessage(std::string message) {
         myfile.close();
 
         bytesRemaining = fileSize;
+        sendZeroBits = bytesRemaining%512 == 0;
         char send[2 + mes.size() + 1];
         send[0] = 0;
         send[1] = 2;
@@ -140,7 +154,7 @@ void Protocol::sendMessage(std::string message) {
         ch->sendBytes(send, 2 + mes.size() + 1);
     } else if (op == "DIRQ") {
         currentState = Dirq;
-        char send[2] = {0, 6}; // TODO
+        char send[2] = {0, 6};
         ch->sendBytes(send, 2);
     } else if (op == "LOGRQ") {
         char send[2 + mes.size() + 1];
@@ -181,7 +195,7 @@ void Protocol::process(Message *message) {
                     myfile.close();
 
 
-                    std::cout << "RRQ " << " complete" << std::endl;
+                    std::cout << "RRQ " << filename << " complete" << std::endl;
                     filename = "";
                 } else if (currentState == Dirq) {
                     vector<std::string> files;
@@ -239,7 +253,7 @@ void Protocol::process(Message *message) {
 
 bool Protocol::receiveNextPacket(DataMessage *dm) {
     bool ret = false;
-    if (dm->size != 0) {
+//    if (dm->size != 0) {
         for (int i = 0; i < dm->size; ++i) {
             readBuffer.push_back(dm->bArr[i]);
         }
@@ -251,7 +265,7 @@ bool Protocol::receiveNextPacket(DataMessage *dm) {
         send[2] = (dm->block >> 8) & 0xFF;
         send[3] = (dm->block & 0xFF);
         ch->sendBytes(send, 4);
-    }
+//    }
     if (dm->size < 512) {
         ret = true;
     }
@@ -326,7 +340,6 @@ bool Protocol::sendNextPacket() {
         ch->sendBytes(b, byteSize);
 
         sendZeroBits = false;
-        delete writeBuffer;
         ret = true;
     }
     blockNum++;
@@ -335,11 +348,12 @@ bool Protocol::sendNextPacket() {
 
 
 bool Protocol::ackReceived(AckMessage *m) {
-    std::cout << "ACK" << m->block << std::endl;
+    std::cout << "ACK " << m->block << std::endl;
     switch (currentState) {
         case 1: //SendingFile
             if (!sendNextPacket()) {
                 currentState = 0; //Waiting
+                cout << "WRQ " << filename << " complete" << endl;
             }
             break;
         default:
