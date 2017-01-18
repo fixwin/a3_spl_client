@@ -40,6 +40,8 @@ private:
     short errorCode = 0;
     bool written = false;
 
+    void errorClear();
+
 public:
     Protocol(ConnectionHandler *ch) : ch(ch), readBuffer(), writeBuffer(), filename(), readerArr() {};
 

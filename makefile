@@ -2,9 +2,7 @@ CFLAGS:=-c -Wall -Weffc++ -g -std=c++11 -Iinclude
 LDFLAGS:=-lboost_system -lboost_locale -lboost_thread
 
 all: clean EchoClient
-	g++ -o bin/client bin/ConnectionHandler.o bin/Client.o bin/Protocol.o $(LDFLAGS) 
-	clear
-	./bin/client 132.73.198.154 7777
+	g++ -o bin/client bin/ConnectionHandler.o bin/Client.o bin/Protocol.o $(LDFLAGS)
 
 EchoClient: bin/ConnectionHandler.o bin/Client.o bin/Protocol.o
 	
@@ -19,5 +17,4 @@ bin/Protocol.o: src/Protocol.cpp
 	
 .PHONY: clean
 clean:
-	clear
 	rm -f bin/*

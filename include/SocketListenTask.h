@@ -11,7 +11,9 @@ public:
 
         while (1) {
             char nextByte;
-            ch->getBytes(&nextByte, 1);
+            if (!ch->getBytes(&nextByte, 1)) {
+                break;
+            }
             protocol->readByte(nextByte);
         }
         boost::this_thread::yield(); //Gives up the remainder of the current thread's time slice, to allow other threads to run.

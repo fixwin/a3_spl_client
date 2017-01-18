@@ -14,6 +14,17 @@ void Protocol::readByte(char nextByte) {
         shortArray[counter] = nextByte;
         if (counter == 1) {
             opCode = bytesToShort(shortArray);
+            if (opCode < 1 || opCode > 10) {
+                char send[5];
+                send[0] = 0;
+                send[0] = 1;
+                send[0] = 0;
+                send[0] = 4;
+                send[0] = 0;
+                ch->sendBytes(send, 5);
+
+                errorClear();
+            }
         }
     } else {
         switch (opCode) {
@@ -143,7 +154,7 @@ void Protocol::sendMessage(std::string message) {
         myfile.close();
 
         bytesRemaining = fileSize;
-        sendZeroBits = bytesRemaining%512 == 0;
+        sendZeroBits = bytesRemaining % 512 == 0;
         char send[2 + mes.size() + 1];
         send[0] = 0;
         send[1] = 2;
@@ -178,6 +189,12 @@ void Protocol::sendMessage(std::string message) {
     } else if (op == "DISC") {
         char send[2] = {0, 10};
         ch->sendBytes(send, 2);
+    } else if (op == "t") {
+        char send[2] = {0,25};
+        cout << "dsf" << endl;
+        ch->sendBytes(send, 2);
+    } else {
+        std::cout << "not valid op" << std::endl;
     }
 }
 
@@ -229,18 +246,9 @@ void Protocol::process(Message *message) {
         }
         case 5: {
             ErrMessage *em = (ErrMessage *) message;
-            std::cout << "Error " << em->errCode << " - " << em->msg << std::endl;
-            delete writeBuffer;
+            std::cout << "Error " << em->errCode << std::endl;
 
-            bytesRemaining = 0;
-            bytesSent = 0;
-            bytesReceived = 0;
-            counter =0;
-            currentState = Waiting;
-            filename.clear();
-            blockNum = 0;
-            packetSize = 0;
-            readerArr.clear();
+            errorClear();
             break;
         }
         case 9: {
@@ -253,19 +261,30 @@ void Protocol::process(Message *message) {
 
 bool Protocol::receiveNextPacket(DataMessage *dm) {
     bool ret = false;
-//    if (dm->size != 0) {
-        for (int i = 0; i < dm->size; ++i) {
-            readBuffer.push_back(dm->bArr[i]);
-        }
 
-        // send ack
-        char send[4];
+    if (dm->size > 512 || dm->size < 0) {
+        char send[5];
         send[0] = 0;
-        send[1] = 4;
-        send[2] = (dm->block >> 8) & 0xFF;
-        send[3] = (dm->block & 0xFF);
-        ch->sendBytes(send, 4);
-//    }
+        send[0] = 1;
+        send[0] = 0;
+        send[0] = 4;
+        send[0] = 0;
+        ch->sendBytes(send, 5);
+        errorClear();
+        return false;
+    }
+
+    for (int i = 0; i < dm->size; ++i) {
+        readBuffer.push_back(dm->bArr[i]);
+    }
+
+    // send ack
+    char send[4];
+    send[0] = 0;
+    send[1] = 4;
+    send[2] = (dm->block >> 8) & 0xFF;
+    send[3] = (dm->block & 0xFF);
+    ch->sendBytes(send, 4);
     if (dm->size < 512) {
         ret = true;
     }
@@ -349,6 +368,21 @@ bool Protocol::sendNextPacket() {
 
 bool Protocol::ackReceived(AckMessage *m) {
     std::cout << "ACK " << m->block << std::endl;
+    if (m->block!=0) {
+        if (blockNum - 1 != m->block) {
+            char send[5];
+            send[0] = 0;
+            send[0] = 1;
+            send[0] = 0;
+            send[0] = 0;
+            send[0] = 0;
+            ch->sendBytes(send, 5);
+
+            errorClear();
+            return false;
+        }
+    }
+
     switch (currentState) {
         case 1: //SendingFile
             if (!sendNextPacket()) {
@@ -372,6 +406,18 @@ short Protocol::bytesToShort(char *bytesArr) {
 void Protocol::shortToBytes(short num, char *bytesArr) {
     bytesArr[0] = ((num >> 8) & 0xFF);
     bytesArr[1] = (num & 0xFF);
+}
+
+void Protocol::errorClear() {
+    bytesRemaining = 0;
+    bytesSent = 0;
+    bytesReceived = 0;
+    counter = 0;
+    currentState = Waiting;
+    filename.clear();
+    blockNum = 0;
+    packetSize = 0;
+    readerArr.clear();
 }
 
 
